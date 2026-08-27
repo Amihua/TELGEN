@@ -1,0 +1,13 @@
+torch>=2.1
+torch-geometric>=2.5
+numpy>=1.24
+scipy>=1.10
+networkx>=3.1
+tqdm>=4.65
+psutil>=5.9
+
+# Optional accelerators. torch-scatter / torch-sparse are NOT required:
+# every code path that used them has a pure-PyTorch fallback, so a
+# mismatched or missing binary build will not break training or eval.
+# torch-scatter
+# torch-sparse
