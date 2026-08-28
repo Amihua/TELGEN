@@ -1,15 +1,4 @@
-# TELGEN
-
-A lightweight, self-contained release of the TELGEN pipeline: a heterogeneous
-GNN that learns to approximate the solution of a multi-commodity network-flow
-LP (traffic engineering) on Erdos-Renyi (ER) random graphs, trained via
-imitation of an interior-point-method (IPM) solver trajectory.
-
-This repo contains just the generate → train → evaluate path for the ER
-benchmark: no experiment logs, no alternative topologies (Waxman/B4/Abilene),
-no DPO/RLHF variants, no notebooks. If you need those, see the full research
-repo this was extracted from.
-
+# TELGEN：Traffic Engineering in Large-scale Networks with Generalizable Graph
 ## Paper
 
 This is the code release for:
