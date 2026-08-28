@@ -10,6 +10,28 @@ benchmark: no experiment logs, no alternative topologies (Waxman/B4/Abilene),
 no DPO/RLHF variants, no notebooks. If you need those, see the full research
 repo this was extracted from.
 
+## Paper
+
+This is the code release for:
+
+> **Traffic Engineering in Large-scale Networks with Generalizable Graph
+> Neural Networks**
+> Fangtong Zhou, Sihao Liu, Xiaorui Liu, Ruozhou Yu, Guoliang Xue.
+> *IEEE Transactions on Networking*, 2026.
+> [IEEE Xplore](https://ieeexplore.ieee.org/document/11367762/)
+
+If you use this code, please cite:
+
+```bibtex
+@article{zhou2026traffic,
+  title={Traffic engineering in large-scale networks with generalizable graph neural networks},
+  author={Zhou, Fangtong and Liu, Sihao and Liu, Xiaorui and Yu, Ruozhou and Xue, Guoliang},
+  journal={IEEE Transactions on Networking},
+  year={2026},
+  publisher={IEEE}
+}
+```
+
 ## Problem setup
 
 Each LP instance is a multi-commodity flow problem on a connected ER graph:
