@@ -4,16 +4,16 @@ import torch
 from torch.nn import Sequential, BatchNorm1d, LayerNorm, InstanceNorm1d, ReLU, Dropout
 from torch_geometric.nn import Linear
 
-# 尝试从 torch_scatter 导入 broadcast；如果失败，则使用简化版 broadcast
-try:  # pragma: no cover - 环境兼容逻辑
+# environment compatibility logic
+try:  # pragma: no cover 
     from torch_scatter.utils import broadcast  # type: ignore
 except Exception:
     def broadcast(index: torch.Tensor, src: torch.Tensor, dim: int) -> torch.Tensor:
         """
-        简化版 broadcast：
-        - 如果 index 已经和 src 形状相同，直接返回；
-        - 如果 index 是一维，沿给定 dim 展开到 src 的形状。
-        仅用于本文件中的 scatter_sum。
+        Simplified broadcast:
+        - If index already has the same shape as src, return immediately.
+        - If index is 1D, expand it along the given dimension to match src's shape.
+        Only used within this file's scatter_sum function.
         """
         if index.dim() == src.dim():
             return index
