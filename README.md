@@ -56,81 +56,136 @@ checkpoints/best_model.pth      # a trained model, ready to use with demo.py / e
 data/raw/                       # bundled ER instances: 54 train files (p 0.3-0.8) + 36 test files
 ```
 
-## Install
+## Reproduce our results with the shipped checkpoint
+
+Everything needed to reproduce the ER evaluation tables is **in this
+repository** — no external downloads. `git clone` gives you the code, the
+54 training + 36 test instance files (`data/raw/`, ~13 MB), and one trained
+model (`checkpoints/best_model.pth`, 1.1 MB, a plain git blob — **not** Git
+LFS, so a normal clone is enough).
+
+### 1. Environment
 
 ```bash
+# Python 3.10 or 3.12 (both tested); a fresh venv/conda env is recommended
+python -m venv .venv && source .venv/bin/activate      # or: conda create -n telgen python=3.10
+
 pip install -r requirements.txt
 ```
 
-Tested with Python 3.10, PyTorch 2.3, PyTorch Geometric 2.5. `torch-scatter`
-and `torch-sparse` are **not required**: every place that used them has a
-pure-PyTorch fallback (see "Notes" below), so a missing or ABI-mismatched
-build of those packages will not break anything.
+This pulls `torch>=2.1`, `torch-geometric>=2.5`, `numpy`, `scipy`,
+`networkx`, `tqdm`, `psutil`. Tested with PyTorch 2.3 / PyG 2.5 on both CPU
+and a single CUDA GPU.
 
-`gurobipy` is optional — used only to compute the exact LP optimum in `demo.py`
-and `eval_er_gurobi_metric.py`. Without it, the bundled interior-point solver in
-`solver/` is used instead (same objective value on these LPs).
+- `torch-scatter` / `torch-sparse` are **not required** — every path that
+  used them has a pure-PyTorch fallback, so a missing or ABI-mismatched
+  build will not break anything.
+- **Gurobi is optional.** `demo.py` and `eval_er_gurobi_metric.py` use it to
+  get the exact LP optimum. These LPs are tiny (~40 variables, ~90
+  constraints), so Gurobi's **free restricted license is sufficient**:
+  `pip install gurobipy`. Without Gurobi the bundled interior-point solver
+  in `solver/` is used instead and produces the same objective values.
 
-## Quick demo
+### 2. Data
 
-The repo ships a trained model (`checkpoints/best_model.pth`) and the ER test
-instances (`data/raw/instance_ER_test_*.pkl.gz`), so you can run it right away —
-no data generation or training needed:
+Already in place at `data/raw/` after cloning:
 
-```bash
-python demo.py                       # ER n=1000, p=0.5, 50 instances
-python demo.py --n 2000 --p 0.9      # a larger / denser test set
-python demo.py --n 1000 --p 0.3 --num_instances 100
-python demo.py --list                # list every available (n, p) test set
+```
+data/raw/instance_ER_train_p{0.3..0.8}_n{20..100}.pkl.gz   # 54 files, training
+data/raw/instance_ER_test_p{0.1..0.9}_n{200,500,1000,2000}.pkl.gz   # 36 files, test
 ```
 
-`demo.py` runs the model on the **large** ER graphs (`n = 1000` and `n = 2000`),
-which are 10-20x bigger than anything in training, and prints:
+Each `.pkl.gz` is a list of `(A, b, c)` LP tuples. Nothing to download or
+move. (You can regenerate them from scratch with
+`python generate_connected_er_data.py --root_dir ./data/raw` — see §5 —
+but the committed files are what the numbers below were produced from.)
+
+### 3. Checkpoint
+
+Already in place at `checkpoints/best_model.pth` after cloning. Config
+(read back from the file): `hidden=64`, `lappe=8`, `ipm_steps=16`,
+`ipm_alpha=0.7`, `losstype=l1`, `conv=gcnconv`, trained 150 epochs with the
+weighted loss (`train_er_weighted.py`), best epoch selected on validation
+objective gap. All scripts default `--checkpoint checkpoints/best_model.pth`.
+
+### 4. Evaluate
+
+All RNGs (`torch`, `numpy`, cuDNN, Gurobi, the Laplacian-PE eigensolver) are
+pinned, so the metric columns are **byte-reproducible** across runs on the
+same machine; `--seed 0` is the default. Small run-to-run differences
+between machines come only from BLAS/Gurobi floating-point order.
+
+#### 4a. Quick check — `demo.py` (large graphs, ~1 min)
+
+`demo.py` runs the model on the **large** ER graphs (`n = 1000`, `2000`),
+10-20x bigger than anything in training, and reports:
 
 | column  | meaning |
 |---------|---------|
 | OGap    | objective (optimality) gap of the raw model output vs the LP optimum |
 | CGap    | total constraint violation of the raw model output (paper's `γ_con`) |
 | OnoCGap | objective gap after a cheap per-link feasibility restoration |
-| time    | model forward time per instance (single, un-batched) |
+| time    | model forward time per instance (single, un-batched; machine-dependent) |
 
-Example output (`--n 1000 --p 0.5`, 50 instances):
+```bash
+python demo.py --n 1000 --p 0.5           # 50 instances (default)
+python demo.py --n 2000 --p 0.9
+python demo.py --list                     # list every available (n, p) test set
+```
+
+Expected output (this checkpoint, `--seed 0`, 50 instances):
 
 ```
+# python demo.py --n 1000 --p 0.5
                OGap     CGap   OnoCGap   time/inst
+  TELGEN      0.07%    3.30%     0.19%     ~330ms
+  paper       3.34%    5.21%     0.48%
+
+# python demo.py --n 2000 --p 0.9
+  TELGEN      0.05%    1.67%     0.10%     ~340ms
+  paper       3.18%    5.48%     0.58%
 ```
 
-All RNGs (`torch`, `numpy`, cuDNN, Gurobi, the Laplacian-PE eigensolver) are pinned,
-so the metric columns are byte-reproducible across runs — override with `--seed`.
+(The `paper` row is the published Table V value for that `(n, p)`, printed
+for side-by-side reference. `time/inst` is machine-dependent.)
+
+#### 4b. Full ER gap table (paper Table V) — `eval_er_gurobi_metric.py`
+
+```bash
+python eval_er_gurobi_metric.py \
+  --checkpoint checkpoints/best_model.pth \
+  --raw_dir data/raw \
+  --n_values 200 500 1000 2000 \
+  --p_values 0.1 0.5 0.9 \
+  --max_instances 100 \
+  --seed 0 \
+  --output_csv table5_repro.csv
+```
 
 
-## 1. Generate data
+
+## Regenerate the data (optional)
 
 ```bash
 python generate_connected_er_data.py --root_dir ./data/raw
 ```
 
-
-## 2. Train
+## Train from scratch (optional)
 
 ```bash
+# simple single-run trainer
 python run_er_single_experiment.py \
-  --data_dir ./data \
-  --test_p 0.9 --test_n 2000 \
+  --data_dir ./data --test_p 0.9 --test_n 2000 \
   --epochs 50 --lr 5e-4 --batchsize 32
+
+# full weighted loss (primal + objective-gap + constraint), as used for the shipped checkpoint
+python train_er_weighted.py \
+  --data_dir ./data --test_p 0.9 --test_n 2000 \
+  --hidden 64 --lappe 8 --ipm_steps 16 --ipm_alpha 0.7 \
+  --losstype l1 --loss_weight_x 1.0 --loss_weight_obj 3.43 --loss_weight_cons 5.8 \
+  --epochs 150 --batchsize 16 --lr 4.6e-4 --seed 2026 \
+  --ckpt_dir ./checkpoints
 ```
-
-
-## 3. Evaluate a checkpoint across densities
-
-```bash
-python eval_er_best_model.py \
-  --checkpoint ./checkpoints/<run_name>/best_model.pth \
-  --data_dir ./data \
-  --output_csv results.csv
-```
-
-
 
 
 ## License
