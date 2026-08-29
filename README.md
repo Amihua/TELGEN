@@ -94,12 +94,14 @@ which are 10-20x bigger than anything in training, and prints:
 | OnoCGap | objective gap after a cheap per-link feasibility restoration |
 | time    | model forward time per instance (single, un-batched) |
 
-Example output (`--n 1000 --p 0.5`):
+Example output (`--n 1000 --p 0.5`, 50 instances):
 
 ```
                OGap     CGap   OnoCGap   time/inst
-  TELGEN      0.05%    2.41%     0.14%    ...
 ```
+
+All RNGs (`torch`, `numpy`, cuDNN, Gurobi, the Laplacian-PE eigensolver) are pinned,
+so the metric columns are byte-reproducible across runs — override with `--seed`.
 
 
 ## 1. Generate data

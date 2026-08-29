@@ -30,11 +30,27 @@ import argparse
 import gzip
 import os
 import pickle
+import random
 import time
 
 import numpy as np
 import torch
 from torch_geometric.data import HeteroData
+
+
+def set_seed(seed: int = 0):
+    """Pin every RNG so the reported numbers are byte-reproducible across runs."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    try:
+        torch.use_deterministic_algorithms(True, warn_only=True)
+    except Exception:
+        pass
+    os.environ.setdefault('CUBLAS_WORKSPACE_CONFIG', ':4096:8')
 
 from models.hetero_gnn import TripartiteHeteroGNN_
 from data.data_preprocess import HeteroAddLaplacianEigenvectorPE
@@ -109,6 +125,8 @@ def project_lp(x_raw, A, b, c, time_limit=10.0):
     ub = np.clip(x_raw.cpu().numpy().astype(np.float64), 0.0, None)
     m = gp.Model()
     m.setParam('OutputFlag', 0)
+    m.setParam('Threads', 1)
+    m.setParam('Seed', 0)
     m.setParam('TimeLimit', time_limit)
     x = m.addMVar(shape=A.shape[1], lb=0.0, ub=ub)
     m.setObjective(c @ x, GRB.MINIMIZE)
@@ -128,6 +146,8 @@ def gurobi_optimum(A, b, c, time_limit=30.0):
     c = c.cpu().numpy().astype(np.float64)
     m = gp.Model()
     m.setParam('OutputFlag', 0)
+    m.setParam('Threads', 1)
+    m.setParam('Seed', 0)
     m.setParam('TimeLimit', time_limit)
     x = m.addMVar(shape=A.shape[1], lb=0.0, ub=1.0)
     m.setObjective(c @ x, GRB.MINIMIZE)
@@ -162,12 +182,14 @@ def main():
     ap.add_argument('--n_values', type=int, nargs='*', default=[200, 500, 1000, 2000])
     ap.add_argument('--max_instances', type=int, default=50, help='instances per (p,n) file; 0 = all')
     ap.add_argument('--sample_seed', type=int, default=42)
+    ap.add_argument('--seed', type=int, default=0, help='global RNG seed (cudnn, torch, numpy) for reproducibility')
     ap.add_argument('--gurobi_time_limit', type=float, default=30.0)
     ap.add_argument('--enforce_feasibility', dest='enforce_feasibility', action='store_true', default=True)
     ap.add_argument('--no_projection', dest='enforce_feasibility', action='store_false')
     ap.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu')
     ap.add_argument('--output_csv', default=None)
     args = ap.parse_args()
+    set_seed(getattr(args, 'seed', 0))
 
     device = torch.device(args.device)
     ckpt = torch.load(args.checkpoint, map_location='cpu', weights_only=False)
@@ -192,6 +214,7 @@ def main():
                 continue
             with gzip.open(fpath, 'rb') as fh:
                 raw = pickle.load(fh)
+            np.random.seed(args.sample_seed + n + int(round(p * 1000)))  # pin PE eigensolver start vector
             rng = np.random.RandomState(args.sample_seed + n + int(round(p * 1000)))
             idx = rng.permutation(len(raw))
             if args.max_instances > 0:

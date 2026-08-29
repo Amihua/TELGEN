@@ -32,10 +32,26 @@ import glob
 import gzip
 import os
 import pickle
+import random
 import time
 
 import numpy as np
 import torch
+
+
+def set_seed(seed: int = 0):
+    """Pin every RNG so the reported numbers are byte-reproducible across runs."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    try:
+        torch.use_deterministic_algorithms(True, warn_only=True)
+    except Exception:
+        pass
+    os.environ.setdefault('CUBLAS_WORKSPACE_CONFIG', ':4096:8')
 
 from models.hetero_gnn import TripartiteHeteroGNN_
 from eval_er_gurobi_metric import build_hetero, project_local
@@ -61,6 +77,7 @@ def lp_optimum(A, b, c):
         import gurobipy as gp
         from gurobipy import GRB
         m = gp.Model(); m.setParam('OutputFlag', 0); m.setParam('TimeLimit', 30.0)
+        m.setParam('Threads', 1); m.setParam('Seed', 0)  # deterministic
         x = m.addMVar(shape=A.shape[1], lb=0.0, ub=1.0)
         m.setObjective(c @ x, GRB.MINIMIZE)
         m.addMConstr(A, x, '<', b)
@@ -98,9 +115,12 @@ def main():
     ap.add_argument('--n', type=int, default=1000, choices=[1000, 2000], help='test graph size')
     ap.add_argument('--p', type=float, default=0.5, help='edge probability (0.1 .. 0.9)')
     ap.add_argument('--num_instances', type=int, default=50)
+    ap.add_argument('--seed', type=int, default=0, help='RNG seed; fixed by default for reproducibility')
     ap.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu')
     ap.add_argument('--list', action='store_true', help='list available test sets and exit')
     args = ap.parse_args()
+
+    set_seed(args.seed)
 
     if args.list:
         for f in sorted(glob.glob(os.path.join(args.raw_dir, 'instance_ER_test_*.pkl.gz'))):
@@ -120,6 +140,7 @@ def main():
     raw = pickle.load(gzip.open(fpath, 'rb'))
     n_eval = min(args.num_instances, len(raw))
     og, cg, onoc, tms = [], [], [], []
+    np.random.seed(args.seed)  # re-pin: the Laplacian-PE eigensolver draws its start vector from numpy's RNG
     for t in raw[:n_eval]:
         A0, b0, c0 = t[0], t[1], t[2]
         data = build_hetero(A0, b0, c0)
