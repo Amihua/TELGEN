@@ -1,4 +1,5 @@
 # TELGEN：Traffic Engineering in Large-scale Networks with Generalizable Graph
+
 ## Paper
 
 This is the code release for:
@@ -26,12 +27,12 @@ If you use this code, please cite:
 Each LP instance is a multi-commodity flow problem on a connected ER graph:
 
 - **Input**: a graph `G(V, E, C)` with random edge capacities, a set of
-  source-destination (s,t) pairs with random demands, and k-shortest
-  candidate paths per pair.
+source-destination (s,t) pairs with random demands, and k-shortest
+candidate paths per pair.
 - **Objective**: maximize total routed demand.
 - **Constraints**: for every commodity, flow across its candidate paths
-  sums to at most 1 (normalized); for every edge, total flow must not
-  exceed capacity.
+sums to at most 1 (normalized); for every edge, total flow must not
+exceed capacity.
 
 The model (`TripartiteHeteroGNN_`) is a heterogeneous GNN over a
 tripartite graph of constraint / variable / objective nodes, trained to
@@ -78,13 +79,13 @@ This pulls `torch>=2.1`, `torch-geometric>=2.5`, `numpy`, `scipy`,
 and a single CUDA GPU.
 
 - `torch-scatter` / `torch-sparse` are **not required** — every path that
-  used them has a pure-PyTorch fallback, so a missing or ABI-mismatched
-  build will not break anything.
+used them has a pure-PyTorch fallback, so a missing or ABI-mismatched
+build will not break anything.
 - **Gurobi is optional.** `demo.py` and `eval_er_gurobi_metric.py` use it to
-  get the exact LP optimum. These LPs are tiny (~40 variables, ~90
-  constraints), so Gurobi's **free restricted license is sufficient**:
-  `pip install gurobipy`. Without Gurobi the bundled interior-point solver
-  in `solver/` is used instead and produces the same objective values.
+get the exact LP optimum. These LPs are tiny (~40 variables, ~90
+constraints), so Gurobi's **free restricted license is sufficient**:
+`pip install gurobipy`. Without Gurobi the bundled interior-point solver
+in `solver/` is used instead and produces the same objective values.
 
 ### 2. Data
 
@@ -120,12 +121,14 @@ between machines come only from BLAS/Gurobi floating-point order.
 `demo.py` runs the model on the **large** ER graphs (`n = 1000`, `2000`),
 10-20x bigger than anything in training, and reports:
 
-| column  | meaning |
-|---------|---------|
-| OGap    | objective (optimality) gap of the raw model output vs the LP optimum |
-| CGap    | total constraint violation of the raw model output (paper's `γ_con`) |
-| OnoCGap | objective gap after a cheap per-link feasibility restoration |
+
+| column  | meaning                                                                 |
+| ------- | ----------------------------------------------------------------------- |
+| OGap    | objective (optimality) gap of the raw model output vs the LP optimum    |
+| CGap    | total constraint violation of the raw model output (paper's `γ_con`)    |
+| OnoCGap | objective gap after a cheap per-link feasibility restoration            |
 | time    | model forward time per instance (single, un-batched; machine-dependent) |
+
 
 ```bash
 python demo.py --n 1000 --p 0.5           # 50 instances (default)
@@ -162,8 +165,6 @@ python eval_er_gurobi_metric.py \
   --output_csv table5_repro.csv
 ```
 
-
-
 ## Regenerate the data (optional)
 
 ```bash
@@ -186,7 +187,6 @@ python train_er_weighted.py \
   --epochs 150 --batchsize 16 --lr 4.6e-4 --seed 2026 \
   --ckpt_dir ./checkpoints
 ```
-
 
 ## License
 
