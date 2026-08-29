@@ -42,13 +42,18 @@ imitate the intermediate iterates of a SciPy interior-point LP solver
 ## Repo layout
 
 ```
+demo.py                         # run the shipped model on the large (n=1000/2000) test graphs
 generate_connected_er_data.py   # generates raw ER LP instances (.pkl.gz)
 run_er_single_experiment.py     # train + validate + test in one run
-eval_er_best_model.py           # evaluate a checkpoint across (n, p) test groups
+train_er_weighted.py            # train with the full weighted loss (primal + objgap + constraint)
+eval_er_best_model.py           # evaluate a checkpoint across (n, p) test groups (IPM-iterate baseline)
+eval_er_gurobi_metric.py        # evaluate against the TRUE LP optimum (Gurobi) with the paper's metrics
 trainer.py                      # Trainer: objective gap / constraint violation / adjusted objective gap
-models/                         # TripartiteHeteroGNN_ and its GNN layers
+models/                         # TripartiteHeteroGNN_, its GNN layers, and the feasibility projection layer
 data/                           # LPDataset, preprocessing transforms, collate utils
 solver/                         # LP interior-point solver used both for data generation and IPM supervision
+checkpoints/best_model.pth      # a trained model, ready to use with demo.py / eval_er_gurobi_metric.py
+data/raw/                       # bundled ER instances: 54 train files (p 0.3-0.8) + 36 test files
 ```
 
 ## Install
@@ -62,23 +67,47 @@ and `torch-sparse` are **not required**: every place that used them has a
 pure-PyTorch fallback (see "Notes" below), so a missing or ABI-mismatched
 build of those packages will not break anything.
 
+`gurobipy` is optional — used only to compute the exact LP optimum in `demo.py`
+and `eval_er_gurobi_metric.py`. Without it, the bundled interior-point solver in
+`solver/` is used instead (same objective value on these LPs).
+
+## Quick demo
+
+The repo ships a trained model (`checkpoints/best_model.pth`) and the ER test
+instances (`data/raw/instance_ER_test_*.pkl.gz`), so you can run it right away —
+no data generation or training needed:
+
+```bash
+python demo.py                       # ER n=1000, p=0.5, 50 instances
+python demo.py --n 2000 --p 0.9      # a larger / denser test set
+python demo.py --n 1000 --p 0.3 --num_instances 100
+python demo.py --list                # list every available (n, p) test set
+```
+
+`demo.py` runs the model on the **large** ER graphs (`n = 1000` and `n = 2000`),
+which are 10-20x bigger than anything in training, and prints:
+
+| column  | meaning |
+|---------|---------|
+| OGap    | objective (optimality) gap of the raw model output vs the LP optimum |
+| CGap    | total constraint violation of the raw model output (paper's `γ_con`) |
+| OnoCGap | objective gap after a cheap per-link feasibility restoration |
+| time    | model forward time per instance (single, un-batched) |
+
+Example output (`--n 1000 --p 0.5`):
+
+```
+               OGap     CGap   OnoCGap   time/inst
+  TELGEN      0.05%    2.41%     0.14%    ...
+```
+
+
 ## 1. Generate data
 
 ```bash
 python generate_connected_er_data.py --root_dir ./data/raw
 ```
 
-Defaults produce the standard benchmark grid: training graphs with
-`n in [20..100]` (step 10) x `p in [0.3..0.8]`, 200 connected instances
-each; test graphs with `n in {200, 500, 1000, 2000}` x
-`p in [0.1..0.9]`, 300 instances each. Every generated graph is checked
-for connectivity (regenerated with a new seed if disconnected) before the
-LP is built and solved. Use `--smoke` for a tiny sanity-check run, or
-`--only train` / `--only test` to generate one half of the grid. See
-`--help` for capacity/demand ranges, SD pair count, and k-shortest-path k.
-
-Files are written as `instance_ER_{train,test}_p{p}_n{n}.pkl.gz` under
-`--root_dir` (default `./data/raw`).
 
 ## 2. Train
 
@@ -89,13 +118,6 @@ python run_er_single_experiment.py \
   --epochs 50 --lr 5e-4 --batchsize 32
 ```
 
-This concatenates **all** `instance_ER_train_*.pkl.gz` files under
-`./data/raw` into one training set, carves out a validation split
-(`--val_seed` / `--val_size`) from it, trains for `--epochs`, and reports
-final objective gap / constraint violation / adjusted objective gap on
-the `(--test_p, --test_n)` test set. The best checkpoint (by validation
-loss) is saved to `--ckpt_dir` (default `./checkpoints`) as
-`best_model.pth`, alongside the args needed to rebuild the model.
 
 ## 3. Evaluate a checkpoint across densities
 
@@ -106,24 +128,8 @@ python eval_er_best_model.py \
   --output_csv results.csv
 ```
 
-Scans `./data/raw` for every available `(n, p)` test group, evaluates the
-checkpoint on each, and prints/saves a table of objective gap, constraint
-violation, and adjusted objective gap (mean ± std) per group. Restrict to
-specific groups with `--p_values` / `--n_values`.
 
-## Notes
 
-- **BatchNorm needs batch size > 1.** With very small datasets (e.g. a
-  `--smoke` run), pick a `--batchsize` that avoids a trailing batch of
-  size 1, or the last batch of an epoch will raise a `ValueError` from
-  `torch.nn.functional.batch_norm`. This is a property of the model
-  (`use_norm=True` uses BatchNorm1d in the encoder), not a data-loading bug.
-- **torch-scatter / torch-sparse fallbacks.** `trainer.py` and
-  `data/dataset.py` try to import `torch_scatter.scatter` and
-  `torch_sparse.SparseTensor` respectively; if either import fails (e.g.
-  an ABI mismatch against your installed PyTorch build), both fall back to
-  a small pure-PyTorch equivalent (`scatter_add`-based) so the pipeline
-  still runs — just without the compiled kernels' speed.
 
 ## License
 

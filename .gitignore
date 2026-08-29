@@ -234,3 +234,4 @@ REPRO_NOTES.local.md
 /checkpoints_*/
 /checkpoints/*
 !/checkpoints/best_model.pth
+/data_dmd_*/
