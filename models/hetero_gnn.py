@@ -6,6 +6,7 @@ from models.gcnconv import GCNConv
 from models.ginconv import GINEConv
 from models.utils import MLP
 from models.hetero_conv import HeteroConv, HeteroConv_quad
+from models.feasible_projection import FeasibleProjectionLayer
 
 # update order, the smaller the higher priority
 
@@ -309,7 +310,12 @@ class TripartiteHeteroGNN_(torch.nn.Module):
                 self.pred_vals.append(MLP([2 * hid_dim] + [hid_dim] * (num_pred_layers - 1) + [1]))
                 self.pred_cons.append(MLP([2 * hid_dim] + [hid_dim] * (num_pred_layers - 1) + [1]))
 
-    def forward(self, data):
+        # Feasibility projection (no learnable params). Applied at inference when
+        # forward(..., enforce_feasibility=True) is passed. See models/feasible_projection.py.
+        self.projection_layer = FeasibleProjectionLayer(projection_iterations=10)
+        self.use_projection = True
+
+    def forward(self, data, enforce_feasibility=None):
         x_dict, edge_index_dict, edge_attr_dict = data.x_dict, data.edge_index_dict, data.edge_attr_dict
         for k in ['cons', 'vals', 'obj']:
             #print(k)
@@ -346,12 +352,29 @@ class TripartiteHeteroGNN_(torch.nn.Module):
             vals = self.pred_vals(torch.stack(vals, dim=0))  # seq * #val * hidden
             cons = self.pred_cons(torch.stack(cons, dim=0))
             vals = F.relu(vals)
-            return vals.squeeze().T, cons.squeeze().T
+            vals, cons = vals.squeeze().T, cons.squeeze().T
         else:
             vals = torch.cat([self.pred_vals[i](vals[i]) for i in range(self.ipm_steps)], dim=1)
             cons = torch.cat([self.pred_cons[i](cons[i]) for i in range(self.ipm_steps)], dim=1)
             vals = F.relu(vals)
-            return vals, cons
+
+        # Optional feasibility projection of the predicted primal iterates onto {x >= 0, A x <= b}.
+        # Matches the eval used for the paper's reported optimality gaps. Single-instance only.
+        if enforce_feasibility and self.use_projection and self.projection_layer is not None:
+            if hasattr(data, 'A_row') and hasattr(data, 'A_col') and hasattr(data, 'A_val'):
+                n_row = int(data.A_num_row.item()) if torch.is_tensor(data.A_num_row) and data.A_num_row.numel() == 1 else int(data.A_num_row)
+                n_col = int(data.A_num_col.item()) if torch.is_tensor(data.A_num_col) and data.A_num_col.numel() == 1 else int(data.A_num_col)
+                A = torch.zeros(n_row, n_col, dtype=data.A_val.dtype, device=data.A_val.device)
+                A[data.A_row, data.A_col] = data.A_val
+                b = data.rhs
+                num_vars, num_steps = vals.shape
+                vals_proj = []
+                for t in range(num_steps):
+                    xt = self.projection_layer(vals[:, t], A, b)
+                    vals_proj.append(xt.squeeze(0) if xt.dim() > 1 else xt)
+                vals = torch.stack(vals_proj, dim=1)
+
+        return vals, cons
   
 
 class TripartiteHeteroGNN_RandInit64(torch.nn.Module):

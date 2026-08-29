@@ -216,3 +216,21 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# TELGEN: local preprocessing cache (regenerated from data/raw by the dataset loader)
+data/processed_*/
+data/raw_testprobe/
+tensorboard_logs/
+
+# local reproduction notes (do not commit)
+REPRO_NOTES.local.md
+*.local.md
+
+# local reproduction scratch (do not commit) -- see REPRO_NOTES.local.md
+/data_p08/
+/data_paper/
+/data_paperB/
+/data_alldens/
+/checkpoints_*/
+/checkpoints/*
+!/checkpoints/best_model.pth
