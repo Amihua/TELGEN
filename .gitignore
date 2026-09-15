@@ -246,3 +246,16 @@ REPRO_NOTES.local.md
 # local reproduction notebooks (do not commit yet)
 /reproduce_tables.ipynb
 /reproduce_tables.executed.ipynb
+
+# local finetune experiment (do not commit)
+/data_sparseaug/
+/checkpoints_finetune/
+/finetune_er_sparse.py
+/train_er_aug.py
+/data_overfit/
+/overfit_probe.py
+/train_er_fix.py
+/data_fix/
+/checkpoints_fix/
+/train_er_selfsup.py
+/checkpoints_selfsup/
