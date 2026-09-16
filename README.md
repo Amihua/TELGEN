@@ -140,12 +140,12 @@ Expected output (this checkpoint, `--seed 0`, 50 instances):
 
 ```
 # python demo.py --n 1000 --p 0.5
-               OGap     CGap   OnoCGap   time/inst
-  TELGEN      0.07%    3.30%     0.19%     ~330ms
+               OGap     CGap   OnoCGap   
+  TELGEN      0.07%    3.30%     0.19% 
   paper       3.34%    5.21%     0.48%
 
 # python demo.py --n 2000 --p 0.9
-  TELGEN      0.05%    1.67%     0.10%     ~340ms
+  TELGEN      0.05%    1.67%     0.10%     
   paper       3.18%    5.48%     0.58%
 ```
 
