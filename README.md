@@ -158,7 +158,7 @@ for side-by-side reference. `time/inst` is machine-dependent.)
 python eval_er_gurobi_metric.py \
   --checkpoint checkpoints/best_model.pth \
   --raw_dir data/raw \
-  --n_values 200 500 1000 2000 \
+  --n_values 500 1000 2000 \
   --p_values 0.1 0.5 0.9 \
   --max_instances 100 \
   --seed 0 \
@@ -187,6 +187,15 @@ python train_er_weighted.py \
   --epochs 150 --batchsize 16 --lr 4.6e-4 --seed 2026 \
   --ckpt_dir ./checkpoints
 ```
+
+## B4 / ASN98 reproduction
+
+
+|                   | OGap  | CGap  | OnoCGap   |
+| ----------------- | ----- | ----- | --------- |
+| B4(`b4_exp/`)     | 5.94% | 1.62% | 1.75%     |
+| ASN98(`ASN_exp/`) | 7.83% | 2.87% | **1.46%** |
+
 
 ## License
 
