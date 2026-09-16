@@ -188,7 +188,7 @@ python train_er_weighted.py \
   --ckpt_dir ./checkpoints
 ```
 
-## B4 / ASN98 reproduction
+## B4 / ASN98 (Table II) reproduction
 
 
 |                   | OGap  | CGap  | OnoCGap   |
