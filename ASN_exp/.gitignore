@@ -1,0 +1,19 @@
+# python / notebook junk
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# macOS AppleDouble junk
+._*
+.DS_Store
+
+# live raw/raw staging dir the gen notebook writes to (overwritten between
+# train/test generation calls) -- the data we keep is raw_asn_saved/, not this
+raw/raw/
+
+# executed-notebook scratch copies from testing this before shipping
+*.executed.ipynb
+
+# wandb local run logs (offline mode writes here during training)
+wandb/
+logs/
