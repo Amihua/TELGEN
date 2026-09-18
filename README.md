@@ -193,8 +193,8 @@ python train_er_weighted.py \
 
 |                   | OGap  | CGap  | OnoCGap   |
 | ----------------- | ----- | ----- | --------- |
-| B4(`b4_exp/`)     | 5.94% | 1.62% | 1.75%     |
-| ASN98(`ASN_exp/`) | 7.83% | 2.87% | **1.46%** |
+| B4([`b4_exp/`](https://github.com/Amihua/TELGEN/tree/main/b4_exp))     | 5.94% | 1.62% | 1.75%     |
+| ASN98([`ASN_exp/`](https://github.com/Amihua/TELGEN/tree/main/ASN_exp)) | 7.83% | 2.87% | **1.46%** |
 
 
 ## License
